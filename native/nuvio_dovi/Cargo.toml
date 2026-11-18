@@ -1,0 +1,21 @@
+[package]
+name = "nuvio_dovi"
+version = "0.1.0"
+edition = "2024"
+license = "MIT"
+description = "JNI bridge from Nuvio's ExoPlayer pipeline to quietvoid's dolby_vision crate (dovi_tool)"
+
+[lib]
+name = "nuvio_dovi"
+crate-type = ["cdylib", "rlib"]
+
+[dependencies]
+dolby_vision = { git = "https://github.com/quietvoid/dovi_tool", rev = "41dae646193c12de152333ff5dbc33579cb9ef4a", default-features = false }
+jni = { version = "0.21", default-features = false }
+
+[profile.release]
+opt-level = 3
+lto = true
+codegen-units = 1
+panic = "unwind"
+strip = "symbols"

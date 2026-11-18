@@ -86,6 +86,15 @@ internal fun PlaybackVideoSettings(
                     )
                     SettingsGroupDivider(isTablet = isTablet)
                     SettingsSwitchRow(
+                        title = stringResource(Res.string.settings_playback_convert_dv7_to_dv81),
+                        description = stringResource(Res.string.settings_playback_convert_dv7_to_dv81_description),
+                        checked = settings.convertDV7ToDV81,
+                        enabled = exoOptionsEnabled,
+                        isTablet = isTablet,
+                        onCheckedChange = PlayerSettingsRepository::setConvertDV7ToDV81,
+                    )
+                    SettingsGroupDivider(isTablet = isTablet)
+                    SettingsSwitchRow(
                         title = stringResource(Res.string.settings_playback_map_dv7_to_hevc),
                         description = stringResource(Res.string.settings_playback_map_dv7_to_hevc_description),
                         checked = settings.mapDV7ToHevc,

@@ -658,6 +658,7 @@ internal fun settingsSearchEntries(
             rows = listOf(
                 PlaybackSearchRow("auto-switch-engine", stringResource(Res.string.settings_playback_auto_switch_engine_on_error), stringResource(Res.string.settings_playback_auto_switch_engine_on_error_description), page = SettingsPage.PlaybackPlayer),
                 PlaybackSearchRow("decoder-priority", stringResource(Res.string.settings_playback_decoder_priority)),
+                PlaybackSearchRow("dv7-dv81", stringResource(Res.string.settings_playback_convert_dv7_to_dv81), stringResource(Res.string.settings_playback_convert_dv7_to_dv81_description)),
                 PlaybackSearchRow("dv7-hevc", stringResource(Res.string.settings_playback_map_dv7_to_hevc), stringResource(Res.string.settings_playback_map_dv7_to_hevc_description)),
                 PlaybackSearchRow("tunneled-playback", stringResource(Res.string.settings_playback_tunneled_playback), stringResource(Res.string.settings_playback_tunneled_playback_description)),
                 PlaybackSearchRow("exo-native-memory", stringResource(Res.string.settings_playback_exo_native_memory), stringResource(Res.string.settings_playback_exo_native_memory_description), page = SettingsPage.PlaybackBuffer),

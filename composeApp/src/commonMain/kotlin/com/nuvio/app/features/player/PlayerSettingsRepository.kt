@@ -72,6 +72,7 @@ data class PlayerSettingsUiState(
     val centerMixLevelDb: Int = 0,
     val decoderPriority: Int = 1,
     val mapDV7ToHevc: Boolean = false,
+    val convertDV7ToDV81: Boolean = true,
     val tunnelingEnabled: Boolean = false,
     val exoNativeMemoryEnabled: Boolean = false,
     val bufferEngineEnabled: Boolean = false,
@@ -187,6 +188,7 @@ object PlayerSettingsRepository {
     private var centerMixLevelDb = 0
     private var decoderPriority = 1
     private var mapDV7ToHevc = false
+    private var convertDV7ToDV81 = true
     private var tunnelingEnabled = false
     private var exoNativeMemoryEnabled = false
     private var bufferEngineEnabled = false
@@ -289,6 +291,7 @@ object PlayerSettingsRepository {
         centerMixLevelDb = 0
         decoderPriority = 1
         mapDV7ToHevc = false
+        convertDV7ToDV81 = true
         tunnelingEnabled = false
         exoNativeMemoryEnabled = false
         bufferEngineEnabled = false
@@ -428,6 +431,7 @@ object PlayerSettingsRepository {
             .coerceIn(CENTER_MIX_LEVEL_MIN_DB, CENTER_MIX_LEVEL_MAX_DB)
         decoderPriority = PlayerSettingsStorage.loadDecoderPriority() ?: 1
         mapDV7ToHevc = PlayerSettingsStorage.loadMapDV7ToHevc() ?: false
+        convertDV7ToDV81 = PlayerSettingsStorage.loadConvertDV7ToDV81() ?: true
         tunnelingEnabled = PlayerSettingsStorage.loadTunnelingEnabled() ?: false
         exoNativeMemoryEnabled = (PlayerSettingsStorage.loadExoNativeMemoryEnabled() ?: false) &&
             isExoNativeMemorySupported()
@@ -867,6 +871,14 @@ object PlayerSettingsRepository {
         decoderPriority = priority
         publish()
         PlayerSettingsStorage.saveDecoderPriority(priority)
+    }
+
+    fun setConvertDV7ToDV81(enabled: Boolean) {
+        ensureLoaded()
+        if (convertDV7ToDV81 == enabled) return
+        convertDV7ToDV81 = enabled
+        publish()
+        PlayerSettingsStorage.saveConvertDV7ToDV81(enabled)
     }
 
     fun setMapDV7ToHevc(enabled: Boolean) {
@@ -1409,6 +1421,7 @@ object PlayerSettingsRepository {
             centerMixLevelDb = centerMixLevelDb,
             decoderPriority = decoderPriority,
             mapDV7ToHevc = mapDV7ToHevc,
+            convertDV7ToDV81 = convertDV7ToDV81,
             tunnelingEnabled = tunnelingEnabled,
             exoNativeMemoryEnabled = exoNativeMemoryEnabled,
             bufferEngineEnabled = bufferEngineEnabled,

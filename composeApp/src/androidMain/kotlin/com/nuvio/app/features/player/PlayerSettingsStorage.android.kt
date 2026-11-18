@@ -71,6 +71,7 @@ actual object PlayerSettingsStorage {
     private const val centerMixLevelDbKey = "center_mix_level_db"
     private const val decoderPriorityKey = "decoder_priority"
     private const val mapDV7ToHevcKey = "map_dv7_to_hevc"
+    private const val convertDV7ToDV81Key = "convert_dv7_to_dv81"
     private const val tunnelingEnabledKey = "tunneling_enabled"
     private const val exoNativeMemoryEnabledKey = "exo_native_memory_enabled"
     private const val vodCacheEnabledKey = "vod_cache_enabled"
@@ -174,6 +175,7 @@ actual object PlayerSettingsStorage {
         centerMixLevelDbKey,
         decoderPriorityKey,
         mapDV7ToHevcKey,
+        convertDV7ToDV81Key,
         tunnelingEnabledKey,
         streamAutoPlayModeKey,
         streamAutoPlaySourceKey,
@@ -1010,6 +1012,23 @@ actual object PlayerSettingsStorage {
             ?.apply()
     }
 
+    actual fun loadConvertDV7ToDV81(): Boolean? =
+        preferences?.let { sharedPreferences ->
+            val key = ProfileScopedKey.of(convertDV7ToDV81Key)
+            if (sharedPreferences.contains(key)) {
+                sharedPreferences.getBoolean(key, true)
+            } else {
+                null
+            }
+        }
+
+    actual fun saveConvertDV7ToDV81(enabled: Boolean) {
+        preferences
+            ?.edit()
+            ?.putBoolean(ProfileScopedKey.of(convertDV7ToDV81Key), enabled)
+            ?.apply()
+    }
+
     actual fun loadTunnelingEnabled(): Boolean? =
         preferences?.let { sharedPreferences ->
             val key = ProfileScopedKey.of(tunnelingEnabledKey)
@@ -1651,6 +1670,7 @@ actual object PlayerSettingsStorage {
         loadCenterMixLevelDb()?.let { put(centerMixLevelDbKey, encodeSyncInt(it)) }
         loadDecoderPriority()?.let { put(decoderPriorityKey, encodeSyncInt(it)) }
         loadMapDV7ToHevc()?.let { put(mapDV7ToHevcKey, encodeSyncBoolean(it)) }
+        loadConvertDV7ToDV81()?.let { put(convertDV7ToDV81Key, encodeSyncBoolean(it)) }
         loadTunnelingEnabled()?.let { put(tunnelingEnabledKey, encodeSyncBoolean(it)) }
         loadStreamAutoPlayMode()?.let { put(streamAutoPlayModeKey, encodeSyncString(it)) }
         loadStreamAutoPlaySource()?.let { put(streamAutoPlaySourceKey, encodeSyncString(it)) }
@@ -1747,6 +1767,7 @@ actual object PlayerSettingsStorage {
         payload.decodeSyncInt(centerMixLevelDbKey)?.let(::saveCenterMixLevelDb)
         payload.decodeSyncInt(decoderPriorityKey)?.let(::saveDecoderPriority)
         payload.decodeSyncBoolean(mapDV7ToHevcKey)?.let(::saveMapDV7ToHevc)
+        payload.decodeSyncBoolean(convertDV7ToDV81Key)?.let(::saveConvertDV7ToDV81)
         payload.decodeSyncBoolean(tunnelingEnabledKey)?.let(::saveTunnelingEnabled)
         payload.decodeSyncString(streamAutoPlayModeKey)?.let(::saveStreamAutoPlayMode)
         payload.decodeSyncString(streamAutoPlaySourceKey)?.let(::saveStreamAutoPlaySource)

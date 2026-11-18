@@ -62,3 +62,6 @@
 -dontwarn org.conscrypt.**
 -dontwarn org.bouncycastle.**
 -dontwarn org.openjsse.**
+
+# Dolby Vision P7 -> 8.1 conversion: JNI entry points in libnuvio_dovi.so are bound by class and method name.
+-keep class com.nuvio.app.features.player.dovi.DoviNative { *; }

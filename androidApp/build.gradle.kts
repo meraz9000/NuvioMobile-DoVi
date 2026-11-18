@@ -79,6 +79,8 @@ android {
     productFlavors {
         create("full") {
             dimension = "distribution"
+            // Dolby Vision P7 -> 8.1 build: installs next to the official Nuvio app.
+            applicationIdSuffix = ".dovi"
         }
         create("playstore") {
             dimension = "distribution"

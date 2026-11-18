@@ -76,6 +76,7 @@ import androidx.media3.ui.PlayerView
 import androidx.media3.ui.SubtitleView
 import androidx.media3.ui.CaptionStyleCompat
 import com.nuvio.app.features.autosync.AutoSyncExtractorsFactory
+import com.nuvio.app.features.player.dovi.DolbyVisionP7ConvertingExtractorsFactory
 import com.nuvio.app.features.autosync.AutoSyncPreferencesRepository
 import com.nuvio.app.features.autosync.LIBMPV_AUTOSYNC_FILE_PREFIX
 import com.nuvio.app.features.autosync.rememberAutoSyncCoordinator
@@ -314,10 +315,13 @@ private fun ExoPlayerSurface(
         resolvedMediaItem.isLocalFileSource()
     }
 
-    val extractorsFactory = remember(sourceUrl) {
+    val extractorsFactory = remember(sourceUrl, playerSettings.convertDV7ToDV81) {
         DefaultExtractorsFactory()
             .setTsExtractorFlags(DefaultTsPayloadReaderFactory.FLAG_ENABLE_HDMV_DTS_AUDIO_STREAMS)
             .setTsExtractorTimestampSearchBytes(1500 * TsExtractor.TS_PACKET_SIZE)
+            .let { factory -> // Dolby Vision Profile 7 -> 8.1 RPU conversion (dovi_tool), as Kodi does.
+                DolbyVisionP7ConvertingExtractorsFactory.wrapIfEnabled(factory, playerSettings.convertDV7ToDV81)
+            }
             .let { factory -> // AutoSync hook: no observation while disabled.
                 AutoSyncPreferencesRepository.ensureLoaded()
                 if (AutoSyncPreferencesRepository.preferredSubtitleAutoSyncOnStart.value) {
@@ -716,6 +720,7 @@ private fun ExoPlayerSurface(
             latestOnError.value(runBlocking { error.toDisplayMessage() })
         }
 
+        var unsupportedDolbyVisionReported = false
         val listener = object : Player.Listener {
             override fun onPlayerError(error: PlaybackException) {
                 syncPlayerViewKeepScreenOn()
@@ -849,6 +854,22 @@ private fun ExoPlayerSurface(
             override fun onTracksChanged(tracks: androidx.media3.common.Tracks) {
                 Log.d(TAG, "onTracksChanged: ${tracks.groups.size} groups total")
                 exoPlayer.logCurrentTracks("onTracksChanged")
+                if (!unsupportedDolbyVisionReported) {
+                    val videoGroups = tracks.groups.filter { it.type == C.TRACK_TYPE_VIDEO }
+                    val unsupportedDv = videoGroups.isNotEmpty() &&
+                        videoGroups.none { group -> (0 until group.length).any(group::isTrackSupported) } &&
+                        videoGroups.any { group ->
+                            (0 until group.length).any { i ->
+                                group.getTrackFormat(i).sampleMimeType == MimeTypes.VIDEO_DOLBY_VISION
+                            }
+                        }
+                    if (unsupportedDv) {
+                        unsupportedDolbyVisionReported = true
+                        val codecs = videoGroups.firstOrNull()?.getTrackFormat(0)?.codecs
+                        Log.w("NuvioDovi", "ExoPlayer has no decoder for Dolby Vision $codecs; reporting to switch engine")
+                        latestOnError.value("This device can't decode Dolby Vision ($codecs) in ExoPlayer.")
+                    }
+                }
                 pendingAudioTrackSelection.firstOrNull()?.let { selection ->
                     if (tracks.groups.any { it.type == C.TRACK_TYPE_AUDIO }) {
                         pendingAudioTrackSelection.clear()
@@ -1490,6 +1511,8 @@ private fun LibmpvPlayerSurface(
                         if (eventId == MPV.mpvEvent.MPV_EVENT_FILE_LOADED) {
                             view.onFileLoaded()
                             view.attachStartupSubtitles()
+                        } else {
+                            view.logHdrOutput()
                         }
                         coroutineScope.launch(Dispatchers.Main.immediate) {
                             latestOnError.value(null)
@@ -1764,6 +1787,11 @@ private class NuvioLibmpvView(
         // Room above 100% for the player's amplification (+10 dB is about 316%).
         mpv.setOptionString("volume-max", "$LIBMPV_MAX_VOLUME_PERCENT").logIfMpvError("volume-max")
         mpv.setOptionString("vd-lavc-film-grain", "cpu")
+        // HDR output: Android's OpenGL context can't tell the display a frame is HDR, so libplacebo
+        // tone-maps everything to SDR. The Vulkan context can (VK_EXT_swapchain_colorspace,
+        // HDR10/PQ), so prefer it and fall back to OpenGL when the driver refuses.
+        mpv.setOptionString("gpu-context", "androidvk,android").logIfMpvError("gpu-context")
+        mpv.setOptionString("target-colorspace-hint", "yes").logIfMpvError("target-colorspace-hint")
         mpv.setPropertyBoolean("keep-open", true)
         mpv.setPropertyBoolean("input-default-bindings", true)
         mpv.setPropertyBoolean("audio-fallback-to-null", true)
@@ -1836,6 +1864,35 @@ private class NuvioLibmpvView(
 
     fun onFileLoaded() {
         fileLoaded = true
+        applyDolbyVisionDecoding()
+    }
+
+    /**
+     * Dolby Vision Profile 5 has no HDR10 base layer (it is IPT-PQ-c2). Without a Dolby Vision
+     * decoder, the colours must be reshaped from the RPU on the GPU, which libplacebo (vo=gpu-next)
+     * does only when FFmpeg's own HEVC decoder exports the RPU. Direct MediaCodec decoding skips
+     * that, so switch this file to software decoding.
+     */
+    fun logHdrOutput() = executeMpv {
+        fun prop(name: String) = runCatching { mpv.getPropertyString(name) }.getOrNull()
+        Log.i(
+            "NuvioDovi",
+            "libmpv output: context=${prop("current-gpu-context")} hwdec=${prop("hwdec-current")} " +
+                "src=${prop("video-params/gamma")}/${prop("video-params/primaries")} " +
+                "target=${prop("video-target-params/gamma")}/${prop("video-target-params/primaries")} " +
+                "targetPeak=${prop("video-target-params/sig-peak")}",
+        )
+    }
+
+    private fun applyDolbyVisionDecoding() = executeMpv {
+        val profile = mpv.getPropertyString("current-tracks/video/dolby-vision-profile")
+            ?.trim()?.toIntOrNull() ?: return@executeMpv
+        val hwdec = mpv.getPropertyString("hwdec-current").orEmpty()
+        Log.i("NuvioDovi", "libmpv: Dolby Vision profile $profile, hwdec-current=$hwdec")
+        if (profile == 5 && hwdec.isNotEmpty() && hwdec != "no") {
+            Log.i("NuvioDovi", "libmpv: Dolby Vision P5 -> software decoding for libplacebo reshaping")
+            mpv.setPropertyString("hwdec", "no")
+        }
     }
 
     fun attachStartupSubtitles() {
